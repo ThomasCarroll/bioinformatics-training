@@ -1,0 +1,482 @@
+%\VignetteIndexEntry{Visualisation and Assessment Of ChIP-seq quality using ChIPQC package}
+%\VignettePackage{ChIPQC}
+%\VignetteEngine{utils::Sweave}
+
+\documentclass{article}
+
+<<style, eval=TRUE, echo=FALSE, results=tex>>=
+BiocStyle::latex()
+@ 
+
+\newcommand{\reff}[1]{Figure \ref{fig:#1}}
+
+\begin{document}
+\SweaveOpts{concordance=TRUE}
+
+\newcommand{\exitem}[3]{\item \texttt{\textbackslash#1\{#2\}} #3 \csname#1\endcsname{#2}.}
+\title{Assessing ChIP-seq sample quality with \Biocpkg{ChIPQC}}
+\author{Thomas Carroll}
+
+\date{Edited: July 20th, 2014; Compiled: \today}
+
+\maketitle
+
+\tableofcontents
+
+\section{Introduction}
+This practical will cover how to assess ChIP-seq data quality using the ChIPQC package with real world datasets.
+
+Due to limitations on time, the data has been processed and ChIPQCexperiments objects prepared for this practical. We will still cover how to set up data for ChIPQC and how to run the main procssing commands but you may wish to load in the processed data provided.
+
+\section{Single sample assessment using \Rfunction{ChIPQCsample()}}
+
+\subsection{A simple example of using \Rfunction{ChIPQCsample()}}
+
+ChIPQC package allows for the rapid generation of ChIP-seq quality metrics from aligned data in BAM format.
+The main function \Rfunction{ChIPQCsample()} can be run with simply a BAM file location and will return a \Robject{ChIPQCsample} object.
+Here we can run ChIPQCsample on a single Bam file of an EBF1 ChIP-seq experiment for chromosome 11. The data used can be found in "/data/ChIPQC/" so feel free to give the function a go or simply load the processed object.
+<<ex1Construct, eval=TRUE, keep.source=FALSE,echo=false>>=
+library(ChIPQC)
+load("/Data/ChIPQC/ebf1_ChIPQCsample.RData")
+@
+
+<<ex11Construct, eval=FALSE, keep.source=TRUE>>=
+library(ChIPQC)
+#bamFile <- "/data/ChIPQC/Chr11_Ebf1DupMarked.bam"
+#exampleExp = ChIPQCsample(bamFile,peaks=NULL,annotation=NULL,chromosomes="chr11")
+load("//Data/ChIPQC/ebf1_ChIPQCsample.RData")
+QCMetrics(exampleExp)
+@
+<<ex12Construct, eval=TRUE, keep.source=TRUE,echo=false>>=
+
+QCmetrics(exampleExp)
+
+@
+This is the simplest way to run ChIPQCsample but to take full advantage of ChIPQC features we can add additional information on blacklisted regions, genome annotation and any peaks we have called for this ChIP.
+
+\textbf{Annotation} is provided for human ("hg19", "hg18"), mouse ("mm10","mm9"), rat ("rn4"), C Elegans ("ce6") and D Melanogaster ("dm3") by way of the Bioconductor TranscriptDb annotations packages. Additional or custom anotation can also be provided to the ChIPQCsample function and we go into this in detail later on.
+
+\textbf{Blacklist} regions are included for hg19 (link to data) and can be provided as a GRanges object or complete file path to blacklists in bed format. Blacklists for a range of species is available from Anshul Kudaje's google site (https://sites.google.com/site/anshulkundaje/projects/blacklists). 
+
+\textbf{Peaks} can also be provided to the ChIPQCsample function as a GRanges object or as complete file path to peaks file in bed format.
+
+<<ex13Construct, eval=T, keep.source=TRUE,echo=F>>=
+load("/data/ChIPQC/ebf1_FullyLoaded_ChIPQCsample.RData")
+
+@
+
+<<ex14Construct, eval=FALSE, keep.source=TRUE>>=
+bamFile <- "/data/ChIPQC/Ebf1DupMarked.bam"
+peaksFile <- "/data/ChIPQC/Ebf1_WithInput_Input_2_proB_peaks.bed"
+BlackListFile <- "/data/ChIPQC/mm9-blacklist.bed"
+
+#exampleExp = ChIPQCsample(bamFile,peaks=peaksFile,annotation="mm9",blacklist=BlackListFile,chromosomes="chr11")
+load("/Data/ChIPQC/ebf1_FullyLoaded_ChIPQCsample.RData")
+QCmetrics(exampleExp)
+@
+<<ex15Construct, eval=TRUE, keep.source=TRUE,echo=false>>=
+
+QCmetrics(exampleExp)
+@
+
+Now the result of \Rfunction{QCmetrics} contains full metrics for ChIP-seq and the additional information on RiP\% and RiBL\%. Lets just remind ourselves what all these mean.
+\begin{description}[align=left,leftmargin=5em]
+\item[Reads] Total reads in bam file
+
+\item[Map\%] Percentage of total reads mapping within file.
+\item[Filt\%] Percentage of mapped reads passing MapQ filter.
+\item[Dup\%] Percentage of mapped reads marked as duplicates.
+\item[ReadL] Mean read length (as integer).
+\item[FragL] Predicted fragmentlength by cross-coverage method.
+\item[RelCC] The relative cross-coverage score
+\item[SSD] Standardised standard deviation
+\item[RiP\%] Reads mapped to peaks
+\item[RiBL\%] Reads mapped to blacklists
+\end{description}
+
+Now we have our full ChIPQCsample object we can start to review and visualise the metrics generated.
+
+\subsection{Cross-coverage and the FragmentLength/Relative cross-coverage scores (FragCC/RelCC)}
+
+For transcription factors and narrow epigenetic marks, an accumulation of watson and crick reads around the binding site/mark may often be seen. The degree to which your ChIP-seq signal is arranged into the watson and crick read clusters around such sites has been previously exploited as a metric of ChIP efficiency.
+
+In ChIPQC we assess the reduction in total genome covered which occurs from shifting the watson reads along the genome (from 5' to 3' of chromsome).
+This is performed by measuring measure total coverage after each every successive shift of 1bp. As the watson reads overlap the crick reads around peaks the total genome covered will be reduced. The total coverage after each successive shift is then converted to cross-coverage scores after each shift.
+
+
+\begin{equation}
+Cross-Coverage Score_n = (Total Genome Coverage_0 - Total Genome Coverage_n)/Total Genome Coverage_0
+\end{equation}
+
+Where \textit{n} is the bp shift of watson reads and \textit{0} is after no shift of watson reads.
+
+The cross-coverage scores after successive shifts can then be visualised and reviewed to identify the expected increase in cross-coverage scores around the fragment length as well as any evidence of artefacts by a peak in the cross-coverage score at the read length.
+
+The plotCC function will calculate cross-coverage scores and plot those after successive shifts. Also shaded in grey is the area to be excluded when identifying the fragment length peak.
+
+@
+<<ex16Construct,fig=T, eval=TRUE, keep.source=TRUE,echo=T,fig.width=4.5, fig.height=4.5>>=
+
+plotCC(exampleExp)
+@
+
+We can see that this Ebf1 ChIP has a peak in cross-coverage scores at around 160bp, corresponding to the fragment size, high above that observed at the 0 shift. This indicates that we have successfully enriched for signal around binding sites. Further to this we can also see an artefact peak at the read length and that this peak is much lower than that observed at fragment length, again indicating an enrichment for ChIP-signal over background. 
+
+
+Further to the visual inspection of the cross-coverage scores, we can extract the RelCC and FragCC scores for this sample using \Rfunction{RelativeCrossCoverage} and \Rfunction{FragmentLengthCrossCoverage} functions respectively. 
+
+These metrics can be considered to relate to efficiency of ChIP (FragCC) and efficiency of ChIP compared to artefact signal (RelCC) and are calculated as below.
+
+
+\begin{equation}
+ FragCC = CrossCoverageScore_{max}
+\end{equation}
+
+\begin{equation}
+ RelCC = CrossCoverageScore_{max}/CrossCoverageScore_{readlength}
+\end{equation}
+Where \textit{max} is shift with maximum cross-coverage score (excluding area 0 to 1.5*readlength) and \textit{readlength} is the shift corresponding to the readlength.
+
+The area around the read length is excluded from selection of shift with maximum cross-coverage scores (shaded in grey in cross-coverage plots). This is due to the presense of the artefact peak which, in less enriched samples, may have greater cross-coverage score than observed at the fragment length. To avoid obsuring the selection of the fragment length peak for fragment length prediction and ascertation of FragCC score and RelCC score this region is removed prior to calculation of shift with maximum cross-coverage score.
+
+
+<<ex18Construct, eval=TRUE, keep.source=TRUE,echo=TRUE>>=
+
+FragmentLengthCrossCoverage(exampleExp)
+
+RelativeCrossCoverage(exampleExp)
+
+@
+
+In this example we find, as expected from cross-coverage scores graph, that the FragCC is high and RelCC score is above 1 indicating a successfull ChIP.
+
+
+\subsection{Distribution of Signal: Within peaks, blacklists and known annotation}
+
+Another useful set of characteristics of your ChIP-seq data is where in the genome the signal is distributed. This can be done by looking for the proportion or percentage of signal in peaks, blacklists or even in known annotation.
+
+To get the percentage of reads landing in peaks and blacklists we can use the \Rfunction{rip} and \Rfunction{ribl} functions as well as the \Rfunction{plotFrip} and \Rfunction{plotFribl} functions for visualisation.
+
+<<ex19Construct2, eval=T,keep.source=TRUE,echo=TRUE>>=
+frip(exampleExp)
+@
+<<ex21Construct2, eval=F,keep.source=TRUE,echo=TRUE>>=
+p1 <- plotFrip(exampleExp)
+p2 <- plotFribl(exampleExp)
+@
+<<ex1Construct2, eval=TRUE, fig=T,keep.source=TRUE,echo=F,height=4,width=8>>=
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=matrix(c(1,2), nrow=1, byrow=TRUE)) {
+  require(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+p1 <- plotFrip(exampleExp)
+p2 <- plotFribl(exampleExp)
+multiplot(p1,p2,cols=2)
+@
+
+The frip and fribl plot, show that we have a percentage of signal in peaks greater than 5\% indicating a ChIP of acceptable quality. Reassuringly, we have a higher signal in peaks than blacklisted regions (2\%) and so an enrichment over artefact signal.
+
+When provided with annotation in the form of genomic regions, ChIPQC can measure the enrichment of signal within them. The regi function provides a simple enrichment statistic which illustrates the distribution of signal within genomic interval annotation over that expected given their size.
+
+\begin{equation}
+ regi = ProportionOfReadsInInterval/ProportionOfGenomeInInterval
+\end{equation}
+
+
+To review regi statistics we can use the regi function or plot enrichment using plotRegi.
+
+<<ex11Construct3, fig=T,eval=T,keep.source=TRUE,echo=TRUE,height=4,width=16>>=
+regi(exampleExp)
+plotRegi(exampleExp)
+@
+
+The regi scores and heatmap show an enrichment for regions around the TSS including 5'UTRs,CDS (potentially first exon) and 500upstream regions. This suggests that Ebf1 is a promoter associated transcription factor as expected by known patterns of binding.
+
+\subsection{Distribution of Signal: Distribution of coverage depth across the genome}
+
+The final metrics to review are those of the distribution of global pile-up across the genome. We can access this in two ways within ChIPQC, first by visualising the histogram of coverage depths and secondly by applying the SSD metrics before and after removal of blacklisted regions.
+
+First we draw the coverage histogram using plotCoverageHistogram. Note the cut-off at 100bp for visualisation purposes. If you want to replot the whole histogram you can extract the data using coveragehistogram function.
+
+<<ex1Construct4, fig=T,eval=T,keep.source=TRUE,echo=TRUE,height=4,width=6>>=
+coveragehistogram(exampleExp)[1:10]
+sum(coveragehistogram(exampleExp)[-c(1:19)])
+plotCoverageHist(exampleExp)
+@
+
+
+The coverage histogram shows that there is a significant stretch of high signal pile-up ( more than 40,000 bps at greater than 20 depth). This may indicate significant signal associated to binding events but could also be from signal seen within blacklisted regions.
+
+To assess the contribution of artefact signal to global distrubtion of signal pileup we measure SSD before and after exclusion of signal from known blacklisted regions.
+
+
+<<ex1Construct5, fig=T,eval=T,keep.source=TRUE,echo=TRUE,height=4,width=10>>=
+plotSSD(exampleExp)
+@
+
+
+Here we find that the SSD signal is not greatly affected by blacklisted regions and so, taken together with the coverage histogram, indicates the Ebf1 ChIP has a clear ChIP-signal above background.
+
+\subsection{Conclusion}
+From the combination of metrics used here we can establish that this Ebf1 ChIP showed an enrichment for structured ChIP-signal, had a signal pile-up above that seen within artefact regions and that this ChIP is positively associated with TSS regions.
+
+\section{Assessing a ChIP-seq experiment using \Rfunction{ChIPQC()}}
+
+When assessing ChIP-seq quality it is most useful to consider your sample quality alongside other ChIP and input samples. Taken together, a full experiment of ChIP and input samples allows for the identifaction of expected enrichment of sample metrics above input but also the variation of sample quality between biological replicates and the identification of bias within input/control samples.
+
+The ChIPQC function wraps the functionality of ChIPQCsample to allow for the assessment of within experiment ChIP sample/input quality alongside user supplied experimental metadata.
+
+\subsection{An example ChIP-seq experiment using \Rfunction{ChIPQC()}}
+
+The ChIPQC function accepts a samplesheet of metadata and file locations alongside the same set of arguments as ChIPQCsample. 
+
+An example of the layout for a sample sheet can be seen in the SampleSheet object below and in the ChIPQC and Diffbind vignettes. ChIPQC can also accept the DBA object from Diffbind package as a starting point for quality control. The result of a call to ChIPQC is the ChIPQCexperiment object which contains the list of ChIPQCsample objects. 
+
+
+<<ex1Construct6, fig=F,eval=F,keep.source=TRUE,echo=T>>=
+load("/Data/ChIPQC/SampleSheet.RData")
+SampleSheet[1:3,]
+#resExperiment = ChIPQC(SampleSheet,peaks=peaksFile,annotation="mm9",blacklist=BlackListFile)
+load("/Data/ChIPQC/BCell_Examples.RData")
+resExperiment
+@
+
+<<ex1Construct26, fig=F,eval=T,keep.source=TRUE,echo=F>>=
+load("/Data/ChIPQC/SampleSheet.RData")
+SampleSheet[1:3,]
+load("/Data/ChIPQC/BCell_Examples.RData")
+QCmetrics(resExperiment)[5:10,]
+@
+
+The QCmetric function now displays a table of metrics as seen for ChIPQCsample and similarly all accessors and plotting functions used for ChIPQCsample objects can be used with the ChIPQCexperiment object. 
+
+In addition to standard plotting routine, ChIPQCexperiment plots can be grouped by the metadata provided using the argument facetBy and for plotCoverageHistogram and plotCC methods the colours and line types controlled by colourBy and lineBy respectively. 
+
+To group/colour/line type by metadata, a character vector of the metadata column title/s to use may be provided. 
+
+<<ex1Construct62, fig=F,eval=F,keep.source=TRUE,echo=T>>=
+facetBy = c("Tissue","Factor","Condition")
+colourBy = c("Treatment","Replicate")
+lineBy = c("Replicate")
+@
+
+
+\subsection{Examining Cross-coverage and FragCC/RelCC scores across an experiment}
+
+As with the ChIPQCsample object, the cross coverage scores for a group of samples can be plotted using plotCC(). By default samples will be groups by their "Tissue" and "Factor" combinations and coloured by their replicate number. Here we group by "Factor", colour by "Tissue" and set the line type by the "Replicate" number.
+
+<<ex1Construct611, fig=T,eval=T,keep.source=TRUE,echo=T,width=14,heigth=20>>=
+FragmentLengthCrossCoverage(resExperiment)[1:3]
+RelativeCrossCoverage(resExperiment)[1:3]
+plotCC(resExperiment,colourBy="Tissue",facetBy="Factor",lineBy="Replicate")
+@
+
+
+From this, it is immediately apparent that some samples not only have much higher scores, and hence efficiency, than others but that there fragment lengths appear to be very different from each other. The DNAse sample for example has a fragment length less than half of Pu1 sample.
+
+Now we have established the difference in total efficiency, we can look at the overall shape of cross-coverage scores and the relationship between signal peaks and artefact peaks in the cross-coverage scores. To help better visualise, we will apply a further facet wrap to the  ggplot2 object returned by plotCC inorder to compare within factors.
+
+<<ex1Construct227, fig=T,eval=T,keep.source=TRUE,echo=T,width=14,heigth=20>>=
+ccplot <- plotCC(resExperiment,colourBy="Tissue",facetBy="Factor",lineBy="Replicate")
+ccplot +facet_wrap(~Factor,scales="free_y")
+@
+
+The free scaled cross-coverage score plots now reveal more about the distibrution of signal within the samples. The Ebf1, Ikaros, Myc, Ifr and RNA Pol2 all show tight peaks within their cross coverage score profiles illustrating their sharp bindng profiles as expected for a transcription factor (and RNA Pol2 around TSS/Enhancers.) The histone marks and Pu1 however show longer more diffused peaks reflecting the wider bredth of signal seen for these epigenetic marks.
+
+The signal of the Ikaros ChIP between cell lines can also be seen to be highly varable with DP thymocytes containing highest RelCC scores, ProB lower and preProB the lowest. This reflects the increased concentrations of Ikaros along haemopoetic differentiation with DP thymocytes having the highest Ikaros levels.
+
+Finally, an enrichment for fragment length signal can be seen in the ProB input. The sharpness of this enrichment suggests a highly duplicated peak like signal within this track which would be cause for further investigation. This may be from the "sono-seq" effect commonly observed in input, where gel-selection of fragment lengths for input causes a small peak in cross coverage scores close to selected fragment length.
+
+\subsection{Distribution of Signal across a ChIPQC experiment}
+
+As with the the ChIPQCsample object, the fraction of signal in peaks, blacklists and annotated genomic intervals can provide an understanding of the ChIPs' efficiency and pattern of enrichment. 
+
+<<ex1Construct28, fig=T,eval=F,keep.source=TRUE,echo=T,width=14,heigth=20>>=
+plotFrip(resExperiment)
+@
+
+<<ex1Construct29, fig=T,eval=T,keep.source=TRUE,echo=F,width=14,heigth=20>>=
+plotFrip(resExperiment)
+@
+<<ex1Construct222, fig=T,eval=F,keep.source=TRUE,echo=T,width=14,heigth=20>>=
+plotFribl(resExperiment)
+@
+
+<<ex1Construct101, fig=T,eval=T,keep.source=TRUE,echo=F,width=14,heigth=20>>=
+plotFribl(resExperiment)
+@
+
+The output from plotFrip immediately identifies the Histone, RNA Pol2 and DNAse ChIP as having the highest enrichment (25\% to 50\%)for reads in peaks as expected for such epigenetic marks. Also apparent are the significant enrichment seen within Pu1, Myc and Irf whereas the Ikaros ChIPs all show considerably lower enrichment for signal within peaks.
+
+The Fribl plot here shows that all samples have equivalent levels of signal so no outlier or need to investigate signal within known blacklisted regions.
+
+Samples such as RNA Pol2, DNAse and Histone marks will have an expected enrichment for genomic locations. Here RNA Pol2 should be expected to have a stonger enrichment at the TSS than RNA Pol2ser2 where as RNA Pol2ser2 should show enrichment within the 3'UTRs regions.
+
+<<ex1Construct111, fig=T,eval=T,keep.source=TRUE,echo=T,width=10,heigth=20>>=
+plotRegi(resExperiment)
+regi(resExperiment)["All3utrs",]
+@
+
+From the Regi plot it can seen that all histone marks, DNA and RNA Pol2 show the expected enrichment across gene regions. Combined with the output from regi function, the RNA Pol2Ser2 has the greatest enrichment at 3'UTRs and so the expected pattern of enrichment. 
+
+To better visualiase this enrichment we can adjust the scale to the enrichment seen in Ch12 input for 3'UTRs.
+
+<<ex1Construct111Scaled, fig=T,eval=T,keep.source=TRUE,echo=T,width=10,heigth=20>>=
+plotRegi(resExperiment)+scale_fill_gradient2(low="white",high="red",mid="white",midpoint=regi(resExperiment)["All3utrs","Input_Ch12"])
+@
+
+Both inputs showed a small but comparatively low enrichment for reads in genic regions. Such enrichment around gene regions can typically be seen for input samples due to the increased accessibilty of chromatin to fragmentation around TSSs.
+
+As with the ChiPQCsample object we can plot the coverage histogram and SSD before and after blacklisting by using the plotCoverageHist and plotSSD functions.
+
+<<ex1Construct121, fig=T,eval=T,keep.source=TRUE,echo=T,width=10,heigth=20>>=
+plotCoverageHist(resExperiment,facetBy="Factor",colourBy="Tissue",lineBy="Replicate")
+@
+
+The coverage histogram shows the expected greater spans of high signal in Histone, RNA Pol2 and DNAse ChIPs as well as for transcription factors with both high Rip\% and RelCC scores. Although most ProB transcription factors have greater spans of high depth than their input, enrichment for these transcription factors can be seen to be much smaller than observed for Histone,RNA Pol2 and DNAse ChIPs. 
+
+The Ikaros ChIPs universally had low enrichment and as seen with other metrics DP thymocytes had the greatest signal.
+
+The two inputs samples show very different patterns of signal depth. The Ch12 input show considerable span of high signal where as the ProB shows a spike in signal at above 98 reads high, in keeping with observed high duplication rate for this sample and fragment length peak in cross-coverage scores.
+
+
+<<ex1Construct141, fig=T,eval=T,keep.source=TRUE,echo=F,width=10,heigth=20>>=
+plotSSD(resExperiment)
+@
+
+The plot of SSD scores before and after blacklisting show that the effect of blacklisting on SSD scores is dramatic. 
+
+
+As with the coverage histogram plots, the histone, polymerase, DNAse marks as well as high scoring TFs have greatest SSDs after blacklisting. 
+
+The SSD for Ikaros after blacklisting can be seen to be just above background with again DP thymocytes having the greatest score.
+
+For the inputs, the Ch12 input can be seen to have its SSD score reduced to a background level of around 0.14 indicating the successfull removal of artefact signal.
+The ProB input however can be seen to not drop to the background level after blacklisting suggesting remaining regions of artefact signal. The fragment length peaks in cross-coverage scores, observed high signal spike in coverage histogram and failure to reduce SSD after blackisting suggests the presence of highly duplicated peak like artefacts within the ProB input and flags this sample for further blacklisting.
+
+
+\subsection{Assessing sample similarity with Diffbind}
+
+A final set of metrics useful for ChIP-quality relate to the correlation between binding events across samples within a ChIPQCexperiment.
+
+The Diffbind package allows for the clustering of samples based on the co-occurence of peaks within samples. When analysing an experiment ChIPQC will perform a sample clustering by default as well as construct the Diffbind DBA object. To produce the a sample heatmap, the plotCorHeatmap function can be used.
+
+
+
+<<ex1Construct151, fig=T,eval=T,keep.source=TRUE,echo=T,width=10,heigth=20>>=
+plotCorHeatmap(resExperiment,facetBy="Factor")
+@
+
+
+The clustering and heatmaps generated from plotCorHeatmap allow us to identify which samples are most closely related and so both the reproducibilty of replicates and the similarity in binding profiles of different epigenetic marks.
+
+Here we see that all replicates cluster tightly together, illustrating the relative reproducibilty of our replicates. Further to this we see that the samples broadly group into their respective tissues with DNAse, RNA Pol2 and Myc forming the Ch12 cluster.
+
+The ProB transcription factor (Pu1, Irf and Ebf) are seen to group together as expected and are found to cluster away from ProB histone marks. This suggests that these transcription factors may be less associated to these histone marks than the Ikaros ChIPs.
+
+\subsection{Conclusion}
+
+The analysis of the quality of this experiment's ChIP quality using ChIPQC has identified several informatics characteristics of the data as well as highlighted variability in quality across ChIPs and cell-lines.
+
+The Histone , RNA Pol2 and DNAse ChIPs all have high RIP\% and SSD after blacklisting as expected from broader epigentic marks. Cross-coverage score profiles illustrate the broader regions of enrichment for the Histone marks, tighter profiles for the RNA Pol2 and RNA Pol2-ser2 marks, due to their narrow enrichment in TSSs and a sharp narrow profile for The DNAse ChIP. These epigenetic marks showed the characteristic enrichment within TSSs with RNApol2-ser2 most enriched for 3'UTRs.
+
+The transcription factor ChIPS showed a much wider variability in RIP\%, SSD and RelCC than seen for histone,pol2 and DNAse ChIPs. Pu1 and Irf were found to be highly efficient ChIPs and Pu1 was seen in its cross coverage scores to have a broader enrichment pattern than seen for for other TFs. The Ikaros ChIPs were found to have acceptable but low enrichment for signal by all metrics, and the enrichment for Ikaros ChIP signal was seen to fit known concentrations of Ikaros within these cell-lines. The ProB Pu1, Ebf and Irf transcription factors were found to cluster away from Ikaros ChIPs indicating a greater co-occurence of binding among them than with Ikaros ChIPs.
+
+The inputs used in this study showed different sources of artefact contamination. The Ch12 input showed a strong artefact, read length, peak in cross-coverage scores and significant pile-up of signal but following blacklisting it's SSD score dropped to that of a background level. This highlights that much of the artefact signal within the Ch12 input was from known mm9 blacklists and further artefact removal is unneccesary. The ProB input however showed peak like signal in its cross-coverage scores profile, a high level of duplication, a spike in its coverage histogram and remaining artefact signal following blacklisting as measured by SSD. Taken togehter this suggests that the ProB input contains highly duplciated peak shaped spikes in signal and further curation and blacklisting should be performed on this input.
+
+
+\section{Advanced Topics}
+\subsection{Providing additional data to ChIPQC plotting and reporting}
+
+The sample sheets for ChIPQC may contain the optional metadata columns "Tissue","Factor","Condition" and "Treatment". In order to allow the user to specify custom metadata for their plotting and reporting, the additional addMetadata argument can be supplied with a data frame of sample IDs and associated additional metadata. The first column for addMetadata data frame must be SampleID and remaining columns may be categorical or discrete data.
+
+
+Here, first we illustrate the relationship between RIP and cross coverage scores by including RIP metrics as metadata and setting the column as colourBy argument.
+
+Then we can use addMetadata argument to group SSD by their ChIP type to highlight higher SSD scores typically seen to Epigenetic marks.
+
+<<ex1Construct162, fig=T,eval=T,keep.source=TRUE,echo=T,width=10,heigth=20>>=
+
+metrics <- QCmetrics(resExperiment)
+metricsMetadata <- data.frame(SampleID=rownames(metrics),RIP =metrics[,"RiP%",drop=T])
+plotCC(resExperiment,addMetaData = metricsMetadata,colourBy="RIP")
+@
+
+<<ex1Construct172, fig=T,eval=T,keep.source=TRUE,echo=T,width=10,heigth=20>>=
+
+metricsMetadata <- data.frame(SampleID=rownames(metrics),ChIPType=
+                    c(rep("Epigenetic Mark",1),
+                    rep("Transcription Factor",1),
+                    rep("Epigenetic Mark",4),
+                    rep("Transcription Factor",4),
+                    rep("Input",2),
+                    rep("Transcription Factor",1),
+                    rep("Epigenetic Mark",2),                    
+                    rep("Transcription Factor",2),                    
+                    rep("Epigenetic Mark",2)))
+
+plotSSD(resExperiment,addMetaData = metricsMetadata,facetBy="ChIPType")
+@
+
+\subsection{Specifying custom annotation}
+
+ChIPQC produces a simple metric for enrichment of signal in known genomic annotation.By default annotation is provided from the TranscriptDB packages specified by "species" argument. ChIPQC also allows for the specification of genomic annotation in the form of GRanges objects and so enrichment in user defined regions can be assessed.
+
+Annotation must be provided as a named list with the first element being "version" and the remaining list elements being GRanges objects. 
+
+Here we will run ChIPQCsample function with DNAse and Histone mark peaks as the annotation.
+
+<<ex1Construct182, fig=T,eval=T,keep.source=TRUE,echo=T,width=10,heigth=20>>=
+
+DNAsePeaks <- peaks(QCsample(resExperiment,"DNAse"))
+H3K4me3Peaks <- peaks(QCsample(resExperiment,"H3K4me3_IkPos"))
+H3K9acPeaks <- peaks(QCsample(resExperiment,"H3K9ac_IkPos"))
+RNAPol2Peaks <- peaks(QCsample(resExperiment,"RNAPol2"))
+
+customAnnotation <- list(version="custom",
+                        DNAse=DNAsePeaks,
+                        RNAPol2=RNAPol2Peaks,
+                        H3K4me3=H3K4me3Peaks,
+                        H3K9ac=H3K9acPeaks)
+#bamFile <- "/data/ChIPQC/Chr11_Ebf1DupMarked.bam
+bamFile <- "/Users/tcarroll/Downloads/Chr11_Ebf1DupMarked.bam"
+#exampleExpCA = ChIPQCsample(bamFile,peaks=NULL,annotation=customAnnotation,chromosomes="chr11")
+load("/Users/tcarroll/Downloads/exampleCustomAnnotation.RData")
+plotRegi(exampleExpCA)
+@
+
+The plotRegi now shows the enrichment over expected for the custom annotation. The order of display of custom annotation is dictated by the order in annotation list and so may rearranged as user desires.
+
+
+\end{document}
