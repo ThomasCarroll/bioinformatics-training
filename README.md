@@ -1,5 +1,7 @@
 bioinformatics-training
 =======================
+Current material
+----------------
 
 Currently we have two courses available here.
 
@@ -9,7 +11,7 @@ The Cambridge Genetics course was created and presented by Thomas Carroll at Cam
 
 
 Upcoming Courses
-=======================
+-----------------
 
 Visualisation of Genomics Data in IGV.
 Beginners guide to ChIP-seq analysis in R.
