@@ -19,7 +19,10 @@ Upcoming Courses
 -----------------
 
 Visualisation of Genomics Data in IGV.
+
 Beginners guide to ChIP-seq analysis in R.
+
 Beginners guide to RNA-seq analysis in R.
+
 
 If you would like to ask a question about these courses or suggest a training topic please contact us on [thomas.carroll@csc.mrc.ac.uk](thomas.carroll@csc.mrc.ac.uk).
