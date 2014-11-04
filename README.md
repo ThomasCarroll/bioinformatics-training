@@ -9,7 +9,7 @@ Currently we have two courses available here.
 
 *Material for this course can be found at the [Bioconductor site](http://www.bioconductor.org/help/course-materials/2014/BioC2014/Bioc2014_ChIPQC_Practical.pdf) or with all the required data here [BioC2014](https://github.com/ThomasCarroll/bioinformatics-training/tree/master/ChIPseq/ChIP_Quality_Control/bioc_2014)*
 
->The Cambridge Genetics course was created and presented by Thomas Carroll at Cambridge genetics for **the Bioinformatics: Analysis of High-throughput sequencing data with Bioconductor** [http://training.csx.cam.ac.uk/event/678728](http://training.csx.cam.ac.uk/event/678728). This course covers ChIP-seq quality control, visualisation and downstream analysis.
+>The Cambridge Genetics course was created and presented by Thomas Carroll and Shamith Samarajiwa at Cambridge genetics for **the Bioinformatics: Analysis of High-throughput sequencing data with Bioconductor** [http://training.csx.cam.ac.uk/event/678728](http://training.csx.cam.ac.uk/event/678728). This course covers ChIP-seq quality control, visualisation and downstream analysis.
 
 *Material for this course can be found here [Cambridge Genetics ChIP-seq Material](https://github.com/ThomasCarroll/bioinformatics-training/tree/master/ChIPseq/ChIP_Quality_Control/Genetics_Cambridge)*
 
