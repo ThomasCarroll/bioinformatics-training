@@ -14,7 +14,7 @@ Currently we have two courses available here.
 *Material for this course can be found here [Cambridge Genetics ChIP-seq Material](https://github.com/ThomasCarroll/bioinformatics-training/tree/master/ChIPseq/ChIP_Quality_Control/Genetics_Cambridge)*
 
 
-
+ 
 Upcoming Courses
 -----------------
 Introduction to R ([Session 1](http://mrccsc.github.io/r_course/introToR_Session1.html#/)/[Session 2 ](http://mrccsc.github.io/r_course/introToR_Session2.html#/))
