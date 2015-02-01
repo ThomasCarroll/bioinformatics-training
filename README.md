@@ -17,7 +17,7 @@ Currently we have two courses available here.
 
 Upcoming Courses
 -----------------
-Introduction to R ([Session 1](http://mrccsc.github.io/r_course/introToR_Session1.html#/)/[Session 2 2](http://mrccsc.github.io/r_course/introToR_Session2.html#/))
+Introduction to R ([Session 1](http://mrccsc.github.io/r_course/introToR_Session1.html#/)/[Session 2 ](http://mrccsc.github.io/r_course/introToR_Session2.html#/))
 
 Visualisation of Genomics Data in IGV.
 
